@@ -3,10 +3,11 @@ name = "index-sort"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-license-file = "LICENSE.txt"
 repository = "https://github.com/arlencox/index-sort"
 readme = "README.md"
 description = "Sort containers by index using user-specified swap and compare functions"
+keywords = ["sort", "algorithm", "index"]
+categories = ["algorithms"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
