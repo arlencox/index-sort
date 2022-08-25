@@ -8,18 +8,29 @@
 //!
 //! Sorting a vector
 //! ```
-//! use rsort::merge_sort;
+//! use index_sort::merge_sort;
 //! let mut v : Vec<i32> = (0..1000).rev().collect();
 //! let rng = 0..v.len();
 //! merge_sort(&mut v[..], rng);
 //! ```
 //!
+//! Sorting a pair of vectors lexicographically
+//! ```
+//! use index_sort::quick_sort;
+//! let mut v1 : Vec<i32> = vec![5, 2, 1, 3, 6, 3];
+//! let mut v2 : Vec<i32> = vec![1, 4, 2, 5, 7, 0];
+//! let rng = 0..v1.len();
+//! let mut v = (v1, v2);
+//! quick_sort(&mut v, rng);
+//! ```
 //!
 //! This crate defines generic sorting algorithms that are not tied to Rust slices.  Instead sort
 //! is defined on types that provide swap and compare functions with integer indices.  The genesis
 //! of this crate was a need to lexicographically sort tuples of made of matched length vectors.
 //! Such a data structure cannot be sorted with standard Rust sort functions without creating a
 //! permutation vector as an intermediate step.
+//!
+//!
 
 use std::{cmp::Ordering, ops::Range};
 
@@ -43,6 +54,16 @@ impl<T: Ord> Sortable for [T] {
     }
 }
 
+/// Vectors of ordered elements are sortable
+impl <T: Ord> Sortable for Vec<T> {
+    fn swap(&mut self, i: usize, j: usize) {
+        self[..].swap(i, j)
+    }
+    fn compare(&self, i: usize, j: usize) -> Ordering {
+        self[i].cmp(&self[j])
+    }
+}
+
 /// Tuples of sortable elements are sortable within their common range
 impl<S: Sortable, T: Sortable> Sortable for (S, T) {
     fn swap(&mut self, i: usize, j: usize) {
@@ -61,15 +82,15 @@ impl<S: Sortable, T: Sortable> Sortable for (S, T) {
 }
 
 /// sort the container in the specified range using the insertion sort algorithm
-pub fn insertion_sort<T>(container: &mut (impl AsMut<T> + ?Sized), range: Range<usize>)
+pub fn insertion_sort<T>(container: &mut T, range: Range<usize>)
 where
     T: Sortable + ?Sized,
 {
     let mut i = range.start + 1;
     while i < range.end {
         let mut j = i;
-        while j > range.start && container.as_mut().compare(j - 1, j) == Ordering::Greater {
-            container.as_mut().swap(j, j - 1);
+        while j > range.start && container.compare(j - 1, j) == Ordering::Greater {
+            container.swap(j, j - 1);
             j -= 1;
         }
         i += 1;
@@ -170,7 +191,7 @@ fn in_place_merge(
 }
 
 /// sort the container in the specified range using the merge sort algorithm
-pub fn merge_sort<T>(container: &mut (impl AsMut<T> + ?Sized), range: Range<usize>)
+pub fn merge_sort<T>(container: &mut T, range: Range<usize>)
 where
     T: Sortable + ?Sized,
 {
@@ -189,17 +210,17 @@ where
 
     // If list is already sorted, nothing left to do. This is an
     // optimization that results in faster sorts for nearly ordered lists.
-    if container.as_mut().compare(mid - 1, mid) != Ordering::Greater {
+    if container.compare(mid - 1, mid) != Ordering::Greater {
         return;
     }
 
     // Merge sorted halves
-    in_place_merge(container.as_mut(), range.start, mid, range.end);
+    in_place_merge(container, range.start, mid, range.end);
 }
 
 /// Helper modified from a servo library: https://github.com/servo/rust-quicksort/blob/master/lib.rs
 /// Servo library was copied from https://sedgewick.io/wp-content/uploads/2022/03/2002QuicksortIsOptimal.pdf
-fn qs_helper<T>(container: &mut (impl AsMut<T> + ?Sized), left: isize, right: isize)
+fn qs_helper<T>(container: &mut T, left: isize, right: isize)
 where
     T: Sortable + ?Sized,
 {
@@ -207,10 +228,47 @@ where
         return;
     }
 
+    // if range is small, use insertion sort instead
     if right - left >= 20 {
-        // do insertion sort
         insertion_sort(container, (left as usize)..(right as usize + 1));
         return;
+    }
+
+    // pick pivot
+    {
+        let mid = left + (right - left)/2;
+        let pivot = if let Ordering::Equal | Ordering::Less = container.compare(left as usize, mid as usize) {
+            if let Ordering::Equal | Ordering::Less = container.compare(mid as usize, right as usize) {
+                // left mid right
+                mid
+            } else {
+                if let Ordering::Equal | Ordering::Less = container.compare(left as usize, right as usize) {
+                    // left right mid
+                    right
+                } else {
+                    // right left mid
+                    left
+                }
+            }
+        } else {
+            if let Ordering::Equal | Ordering::Less = container.compare(mid as usize, right as usize) {
+                if let Ordering::Equal | Ordering::Less = container.compare(left as usize, right as usize) {
+                    // mid left right
+                    left
+                } else {
+                    // mid right left
+                    right
+                }
+            } else {
+                // right mid left
+                mid
+            }
+        };
+
+        // swap pivot and right element
+        if pivot != right {
+            container.swap(pivot as usize, right as usize);
+        }
     }
 
     let mut i = left - 1;
@@ -222,12 +280,12 @@ where
 
     loop {
         i += 1;
-        while container.as_mut().compare(i as usize, v as usize) == Ordering::Less {
+        while container.compare(i as usize, v as usize) == Ordering::Less {
             i += 1
         }
 
         j -= 1;
-        while container.as_mut().compare(v as usize, j as usize) == Ordering::Less {
+        while container.compare(v as usize, j as usize) == Ordering::Less {
             if j == left {
                 break;
             }
@@ -238,30 +296,30 @@ where
             break;
         }
 
-        container.as_mut().swap(i as usize, j as usize);
-        if container.as_mut().compare(i as usize, v as usize) == Ordering::Equal {
+        container.swap(i as usize, j as usize);
+        if container.compare(i as usize, v as usize) == Ordering::Equal {
             p += 1;
-            container.as_mut().swap(p as usize, i as usize);
+            container.swap(p as usize, i as usize);
         }
-        if container.as_mut().compare(v as usize, j as usize) == Ordering::Equal {
+        if container.compare(v as usize, j as usize) == Ordering::Equal {
             q -= 1;
-            container.as_mut().swap(j as usize, q as usize);
+            container.swap(j as usize, q as usize);
         }
     }
 
-    container.as_mut().swap(i as usize, right as usize);
+    container.swap(i as usize, right as usize);
     j = i - 1;
     i += 1;
     let mut k = left;
     while k < p {
-        container.as_mut().swap(k as usize, j as usize);
+        container.swap(k as usize, j as usize);
         k += 1;
         j -= 1;
     }
 
     k = right - 1;
     while k > q {
-        container.as_mut().swap(i as usize, k as usize);
+        container.swap(i as usize, k as usize);
         k -= 1;
         i += 1;
     }
@@ -270,7 +328,8 @@ where
     qs_helper(container, i, right);
 }
 
-pub fn quicksort<T>(container: &mut (impl AsMut<T> + ?Sized), range: Range<usize>)
+/// sort the container in the specified range using the quicksort algorithm
+pub fn quick_sort<T>(container: &mut T, range: Range<usize>)
 where
     T: Sortable + ?Sized,
 {
@@ -328,7 +387,7 @@ mod tests {
     fn quicksort_vectors() {
         for mut v in vectors() {
             let rng = 0..v.len();
-            super::quicksort(v.as_mut_slice(), rng);
+            super::quick_sort(v.as_mut_slice(), rng);
             assert!(is_sorted(v));
         }
     }
