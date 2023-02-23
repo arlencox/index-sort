@@ -32,7 +32,11 @@
 //!
 //!
 
-use std::{cmp::Ordering, ops::Range};
+// Enable `no_std` unless the `std` feature is enabled or the crate is
+// compiled in test mode.
+#![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
+
+use core::{cmp::Ordering, ops::Range};
 
 /// Sortable is defined for types that should be allowed to be sorted.
 pub trait Sortable {
@@ -55,6 +59,7 @@ impl<T: Ord> Sortable for [T] {
 }
 
 /// Vectors of ordered elements are sortable
+#[cfg(feature = "std")]
 impl <T: Ord> Sortable for Vec<T> {
     fn swap(&mut self, i: usize, j: usize) {
         self[..].swap(i, j)
