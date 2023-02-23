@@ -38,3 +38,8 @@ same api.
   - `insertion_sort` does the classic N^2 sorting algorithm
   - `merge_sort` performs an in-place stable sort using an adaptation of the merge sort algorithm provided in the fastutil library
   - `quick_sort` performs an unstable sort using a quick sort algorithm based on the implementation used in Servo
+
+Features
+--------
+
+The `std` feature (enabled by default) adds a `Sortable` impl for `Vec`.
